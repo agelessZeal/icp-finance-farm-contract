@@ -1005,7 +1005,7 @@ contract ICPBar is ERC20("Staked ICP", "st-ICP"),ReentrancyGuard{
     // Locks Staked and mints xStaked
     function enter(uint256 _amount) public nonReentrant {
 
-        uint256 unlockTime = block.timestamp + 7 * 1 days;
+        uint256 unlockTime = block.timestamp + 7 days;
 
         UserInfo storage user = userInfo[msg.sender];
 
@@ -1035,7 +1035,7 @@ contract ICPBar is ERC20("Staked ICP", "st-ICP"),ReentrancyGuard{
         UserInfo storage user = userInfo[msg.sender];
 
 
-        require(block.timestamp < user.unlockTime, "lock time");
+        require(block.timestamp > user.unlockTime, "lock time");
 
         // Gets the amount of xStaked in existence
         uint256 totalShares = totalSupply();
