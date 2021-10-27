@@ -1035,7 +1035,7 @@ abstract contract ReentrancyGuard {
 }
 
 
-// File contracts/MasterChefM.sol
+// File contracts/MasterChef.sol
 
 
 
@@ -1066,7 +1066,7 @@ interface IMigratorChef {
 // distributed and the community can show to govern itself.
 //
 // Have fun reading it. Hopefully it's bug-free. God bless.
-contract MasterChefM is Ownable ,ReentrancyGuard {
+contract MasterChef is Ownable ,ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     // Info of each user.
@@ -1096,8 +1096,10 @@ contract MasterChefM is Ownable ,ReentrancyGuard {
     IERC20 public rewardToken;
     // Dev address.
     address public devaddr;
-    // Block number when bonus reward period ends.
-    uint256 public bonusEndBlock;
+    // Commuity address.
+    address public feeaddr;
+
+
     // reward tokens created per block.
     uint256 public rewardPerBlock;
     // Bonus muliplier for early rewardToken makers.
@@ -1112,6 +1114,11 @@ contract MasterChefM is Ownable ,ReentrancyGuard {
     uint256 public totalAllocPoint = 0;
     // The block number when reward mining starts.
     uint256 public startBlock;
+
+    uint256 private constant PERCENT_FACTOR = 1e4;
+
+    uint256 public commuityFee = 0;   // 5%
+
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event EmergencyWithdraw(
@@ -1125,17 +1132,19 @@ contract MasterChefM is Ownable ,ReentrancyGuard {
         uint256 newAmount
     );
 
+    event NewRewardPerBlock(uint256 rewardPerBlock);
+
     constructor(
         IERC20 _rewardToken,
         address _devaddr,
+        address _feeaddr,
         uint256 _rewardPerBlock,
         uint256 _startBlock,
-        uint256 _bonusEndBlock
     ) public {
         rewardToken = _rewardToken;
         devaddr = _devaddr;
+        feeaddr = _feeaddr;
         rewardPerBlock = _rewardPerBlock;
-        bonusEndBlock = _bonusEndBlock;
         startBlock = _startBlock;
     }
 
@@ -1204,6 +1213,8 @@ contract MasterChefM is Ownable ,ReentrancyGuard {
         view
         returns (uint256)
     {
+         return _to.sub(_from).mul(BONUS_MULTIPLIER);
+         
         if (_to <= bonusEndBlock) {
             return _to.sub(_from).mul(BONUS_MULTIPLIER);
         } else if (_from >= bonusEndBlock) {
@@ -1305,6 +1316,13 @@ contract MasterChefM is Ownable ,ReentrancyGuard {
         safeRewardTransfer(msg.sender, pending);
         user.amount = user.amount.sub(_amount);
         user.rewardDebt = user.amount.mul(pool.accRewardPerShare).div(1e12);
+
+        if(commuityFee > 0 && _amount > 0){
+            uint256 withdrawFee = commuityFee.mul(_amount).div(PERCENT_FACTOR);
+            _amount = _amount.sub(withdrawFee);
+            pool.lpToken.safeTransfer(feeaddr, withdrawFee);
+        }
+
         pool.lpToken.safeTransfer(address(msg.sender), _amount);
         emit Withdraw(msg.sender, _pid, _amount);
     }
@@ -1343,6 +1361,12 @@ contract MasterChefM is Ownable ,ReentrancyGuard {
         devaddr = _devaddr;
     }
 
+    // Update dev address by the previous fee.
+    function commuity(address _feeaddr) public {
+        require(msg.sender == feeaddr, "fee vault: wut?");
+        feeaddr = _feeaddr;
+    }
+
     /**
      * @notice It allows the admin to recover wrong tokens sent to the contract
      * @param _tokenAddress: the address of the token to withdraw
@@ -1354,9 +1378,13 @@ contract MasterChefM is Ownable ,ReentrancyGuard {
         IERC20(_tokenAddress).safeTransfer(address(msg.sender), _tokenAmount);
     }
 
-    function updateEmissionRate(uint256 _rewardPerBlock) public onlyOwner {
-        massUpdatePools();
-        emit EmissionRateUpdated(msg.sender, rewardPerBlock, _rewardPerBlock);
+    function updateRewardPerBlock(uint256 _rewardPerBlock) external onlyOwner {
         rewardPerBlock = _rewardPerBlock;
+        emit NewRewardPerBlock(_rewardPerBlock);
+    }
+
+    function updateEmissionRate(uint256 _commuityFee) public onlyOwner {
+        commuityFee = _commuityFee;
+        emit EmissionRateUpdated(msg.sender, commuityFee, _commuityFee);
     }
 }

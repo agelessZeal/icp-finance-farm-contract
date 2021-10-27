@@ -45,6 +45,13 @@ module.exports = {
     bsctestnet: {
       url: "https://data-seed-prebsc-2-s3.binance.org:8545/",
     },
+    matic: {
+      url: "https://rpc-mainnet.maticvigil.com",
+      accounts,
+      chainId: 137,
+      live: true,
+      saveDeployments: true,
+    },
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
